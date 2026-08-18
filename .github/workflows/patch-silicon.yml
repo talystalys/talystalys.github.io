@@ -1,0 +1,45 @@
+name: patch-silicon
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Silicon copy
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text()
+          replacements = {
+              'paper → native → vulkan': 'gpu-backed world generation',
+              'GPU-backed server compute architecture built around a Java 25 → C ABI → Rust → Vulkan path. The recording shows the diagnostic Paper integration producing client-visible chunks through the qualified GPU occupancy path.': 'An experimental Minecraft server architecture that moves selected world-generation work onto the GPU. The recording shows real, client-visible chunks being generated through the GPU-backed path.',
+              '<span><b>path</b> Java 25 / FFM / Rust / Vulkan</span><span><b>state</b> milestone 4 partial</span><span><b>details</b> additional technical details available on request</span>': '<span><b>focus</b> GPU-accelerated world generation</span><span><b>state</b> working prototype</span><span><b>details</b> additional technical details available on request</span>',
+          }
+          changed = False
+          for old, new in replacements.items():
+              if old in s:
+                  s = s.replace(old, new)
+                  changed = True
+          if not changed and ('milestone' in s.lower() or 'C ABI' in s):
+              raise SystemExit('expected Silicon strings not found; refusing partial patch')
+          s = ''.join(s.splitlines())
+          low = s.lower()
+          if 'milestone' in low or 'm4' in low or 'c abi' in low:
+              raise SystemExit('forbidden Silicon wording still present')
+          p.write_text(s)
+          PY
+      - name: Commit patch
+        shell: bash
+        run: |
+          if git diff --quiet -- index.html; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add index.html
+          git commit -m "Simplify Silicon description"
+          git push
